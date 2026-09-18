@@ -11,15 +11,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: PWABuilder Android Package Generator
+        uses: pwabuilder/pwabuilder-action@v2
         with:
-          node-version: 18
-
-      - name: Build APK via PWABuilder CLI
-        run: |
-          npm install -g @pwabuilder/pwabuilder-cli
-          pwabuilder generate --webManifestUrl https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/manifest.json --platform android --options '{"backgroundColour":"#7C2A2A","themeColor":"#7C2A2A"}'
+          url: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          platform: android
+          name: ${{ github.event.repository.name }}
+          output: output/android
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
