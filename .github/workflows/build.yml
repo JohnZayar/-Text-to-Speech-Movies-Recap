@@ -59,7 +59,7 @@ jobs:
           unzip -q cmdtools.zip -d "$SDK"
           mv "$SDK/cmdline-tools" "$SDK/tools"
           yes | "$SDK/tools/bin/sdkmanager" --sdk_root="$SDK" --licenses > /dev/null || true
-          "$SDK/tools/bin/sdkmanager" --sdk_root="$SDK" "platform-tools" "platforms;android-35" "build-tools;35.0.0" "build-tools;36.0.0"
+          "$SDK/tools/bin/sdkmanager" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;34.0.0" "build-tools;35.0.0" "build-tools;36.0.0"
           echo "ANDROID_SDK=$SDK" >> $GITHUB_ENV
           ls "$SDK" "$SDK/build-tools"
 
@@ -134,7 +134,20 @@ jobs:
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ env.KS_PASS }}
           BUBBLEWRAP_KEY_PASSWORD: ${{ env.KS_PASS }}
-        run: bubblewrap build --skipPwaValidation
+          ANDROID_HOME: ${{ env.ANDROID_SDK }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK }}
+        run: |
+          set +e
+          bubblewrap build --skipPwaValidation 2>&1 | tee build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" != "0" ]; then
+            echo ""
+            echo "################ ERROR SUMMARY ################"
+            grep -n -A15 "What went wrong" build.log | head -60
+            grep -n "Caused by" build.log | head -15
+            echo "################ END SUMMARY ##################"
+          fi
+          exit $STATUS
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
