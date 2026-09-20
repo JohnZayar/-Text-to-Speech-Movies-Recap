@@ -238,6 +238,13 @@
           <button class="btn-speak" id="free-generate">▶ သီဟ အသံဖြင့် ဖတ်ပါ</button>
         </div>
         <div class="notice" id="free-audio-notice">key၊ login၊ ဆိုက်လင့်ခ် လုံးဝမလိုပါ — အသံရွေးပြီး ခလုတ်ကိုနှိပ်ရုံပါ။ Microsoft ရဲ့ မြန်မာ neural အသံ (သီဟ/နီလာ) ကို အင်တာနက်ဖြင့် တိုက်ရိုက်သုံးထားပါတယ်။ Microsoft Edge browser မှာ အကောင်းဆုံးအလုပ်လုပ်ပါတယ်။</div>
+        <details id="relay-box" style="margin-top:10px;">
+          <summary style="cursor:pointer; font-size:13px; color:var(--ink-soft); padding:6px 0;">🔧 Chrome / APK မှာ အသံမထွက်ရင် — Relay URL ထည့်ရန်</summary>
+          <div class="add-row" style="margin-top:8px;">
+            <input type="text" id="relay-url" placeholder="https://xxxx.workers.dev" autocapitalize="off" autocomplete="off" spellcheck="false">
+            <button class="btn-outline btn-small" id="relay-save">သိမ်းမည်</button>
+          </div>
+        </details>
       </div>
 
       <div class="field">
@@ -486,6 +493,50 @@ const EDGE_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
 const EDGE_VERSION = '143.0.3650.75';
 const EDGE_WS = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1';
 
+/* Relay (Cloudflare Worker) — Chrome/APK က Microsoft ကို တိုက်ရိုက်မချိတ်နိုင်လို့ ကြားခံ။
+   DEFAULT_RELAY_URL မှာ Worker URL ကို ထည့်ထားရင် ဒီ app သုံးသူအားလုံး သတ်မှတ်စရာမလိုတော့ပါ။ */
+const DEFAULT_RELAY_URL = '';
+const RELAY_STORAGE = 'myanmar-tts-relay-url';
+let relayUrl = DEFAULT_RELAY_URL;
+let lastRelayError = '';
+try{ const saved = localStorage.getItem(RELAY_STORAGE); if(saved){ relayUrl = saved; } } catch(e){}
+const relayBoxEl = document.getElementById('relay-box');
+const relayInputEl = document.getElementById('relay-url');
+const relaySaveBtn = document.getElementById('relay-save');
+relayInputEl.value = relayUrl;
+if(relayUrl && !DEFAULT_RELAY_URL){ /* သိမ်းထားပြီးသားဆိုရင် အဖွင့်မလိုပါ */ }
+relaySaveBtn.addEventListener('click', () => {
+  let v = relayInputEl.value.trim();
+  if(v && !/^https:\/\//i.test(v)){ setFreeNotice('URL က https:// နဲ့ စရပါမယ်။', true); return; }
+  relayUrl = v || DEFAULT_RELAY_URL;
+  try{ if(v){ localStorage.setItem(RELAY_STORAGE, v); } else { localStorage.removeItem(RELAY_STORAGE); } } catch(e){}
+  setFreeNotice(v ? 'Relay URL သိမ်းပြီးပါပြီ — အသံဖတ်ကြည့်ပါ။' : 'Relay URL ဖယ်ရှားပြီးပါပြီ။', false);
+});
+
+async function relaySynthChunk(text, voiceId, ratePct, pitchHz){
+  const res = await fetch(relayUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify({ text: text, voice: voiceId, rate: ratePct, pitch: pitchHz })
+  });
+  if(!res.ok){
+    let msg = '';
+    try{ msg = (await res.text()).slice(0, 120); } catch(e){}
+    throw new Error('relay HTTP ' + res.status + ' ' + msg);
+  }
+  const buf = await res.arrayBuffer();
+  if(!buf.byteLength){ throw new Error('relay-empty'); }
+  return [new Uint8Array(buf)];
+}
+
+async function synthChunk(text, voiceId, ratePct, pitchHz){
+  if(relayUrl){
+    try{ lastRelayError = ''; return await relaySynthChunk(text, voiceId, ratePct, pitchHz); }
+    catch(e){ lastRelayError = e.message || String(e); }
+  }
+  return edgeSynthChunk(text, voiceId, ratePct, pitchHz);
+}
+
 function updateFreeBtn(){
   freeGenerateBtn.textContent = '▶ ' + FREE_VOICES[freeVoiceKey].label + ' အသံဖြင့် ဖတ်ပါ';
 }
@@ -650,7 +701,7 @@ async function generateFreeVoice(){
     for(let i = 0; i < chunks.length; i++){
       if(freeCancelled) throw new Error('cancelled');
       if(chunks.length > 1){ setFreeNotice(v.label + ' အသံ ထုတ်နေသည် (' + (i + 1) + '/' + chunks.length + ')...', false); }
-      const parts = await edgeSynthChunk(chunks[i], v.id, ratePctStr, pitchStr);
+      const parts = await synthChunk(chunks[i], v.id, ratePctStr, pitchStr);
       audioParts.push(...parts);
     }
     if(freeCancelled) throw new Error('cancelled');
@@ -677,11 +728,15 @@ async function generateFreeVoice(){
     if(spoke){
       setFreeNotice('browser ထဲက ' + v.label + ' အသံဖြင့် ဖတ်ပြီးပါပြီ။ (ဒီနည်းနဲ့ဆို MP3 download မရနိုင်ပါ)', false);
     } else {
-      setFreeNotice(
-        v.label + ' အသံကို တိုက်ရိုက်ချိတ်မရပါ။ (၁) အင်တာနက် ချိတ်ထားသလား၊ ဖုန်း/ကွန်ပျူတာရဲ့ နာရီ၊ နေ့စွဲ မှန်သလား စစ်ပါ။ ' +
-        '(၂) Microsoft က Chrome/APK လို Edge မဟုတ်တဲ့ browser ကနေ ချိတ်တာကို ပိတ်ထားနိုင်ပါတယ် — Microsoft Edge browser နဲ့ ဒီစာမျက်နှာကို ဖွင့်ကြည့်ပါ။ ' +
-        '(၃) ⚙️ ဆက်တင်ထဲက browser default မြန်မာအသံနဲ့ အောက်က "အသံဖတ်ပါ" ကိုလည်း သုံးနိုင်ပါတယ်။',
-        true);
+      if(relayUrl){
+        setFreeNotice(v.label + ' အသံ မထွက်ပါ — Relay URL မှန်မမှန် (workers.dev လင့်ခ်အပြည့်) စစ်ပါ။ (' + lastRelayError + ')', true);
+      } else {
+        setFreeNotice(
+          v.label + ' အသံကို တိုက်ရိုက်ချိတ်မရပါ။ Chrome/APK က Microsoft ကို တိုက်ရိုက်ချိတ်ခွင့်မရလို့ ဖြစ်တာများပါတယ်။ ' +
+          'အောက်က 🔧 "Relay URL ထည့်ရန်" ကိုဖွင့်ပြီး Worker URL ထည့်ပါ။ (Microsoft Edge browser မှာတော့ ဒီအတိုင်းရနိုင်ပါတယ်)',
+          true);
+        relayBoxEl.open = true;
+      }
     }
   }
 }
