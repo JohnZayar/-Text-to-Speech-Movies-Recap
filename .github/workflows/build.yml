@@ -55,7 +55,58 @@ jobs:
         run: |
           SDK="$HOME/android-sdk"
           mkdir -p "$SDK"
-C            "startUrl": "$REPO_PATH/index.html",
+          curl -sSL -o cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdtools.zip -d "$SDK"
+          mv "$SDK/cmdline-tools" "$SDK/tools"
+          yes | "$SDK/tools/bin/sdkmanager" --sdk_root="$SDK" --licenses > /dev/null || true
+          "$SDK/tools/bin/sdkmanager" --sdk_root="$SDK" "platform-tools" "platforms;android-34" "platforms;android-35" "platforms;android-36" "build-tools;34.0.0" "build-tools;35.0.0" "build-tools;36.0.0"
+          echo "ANDROID_SDK=$SDK" >> $GITHUB_ENV
+          ls "$SDK" "$SDK/build-tools"
+
+      - name: Configure Bubblewrap (JDK + Android SDK)
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat > ~/.bubblewrap/config.json <<EOF2
+          {
+            "jdkPath": "$JAVA_HOME",
+            "androidSdkPath": "$ANDROID_SDK"
+          }
+          EOF2
+          cat ~/.bubblewrap/config.json
+
+      - name: Create signing key
+        run: |
+          mkdir -p twa
+          if [ -f keystore.b64 ]; then
+            echo "ပုံသေ keystore (keystore.b64) ကို သုံးနေသည်"
+            base64 -d keystore.b64 > twa/android.keystore
+          else
+            cd twa
+            keytool -genkeypair -v -keystore android.keystore -alias android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KS_PASS" \
+              -dname "CN=Myanmar TTS, OU=App, O=App, L=Yangon, ST=Yangon, C=MM"
+          fi
+
+      - name: Write twa-manifest.json
+        run: |
+          cd twa
+          cat > twa-manifest.json <<EOF2
+          {
+            "packageId": "$PKG",
+            "host": "$HOST",
+            "name": "မြန်မာစာဖတ် — Text to Speech",
+            "launcherName": "မြန်မာစာဖတ်",
+            "display": "standalone",
+            "themeColor": "#7C2A2A",
+            "themeColorDark": "#7C2A2A",
+            "navigationColor": "#7C2A2A",
+            "navigationColorDark": "#7C2A2A",
+            "navigationDividerColor": "#7C2A2A",
+            "navigationDividerColorDark": "#7C2A2A",
+            "backgroundColor": "#F3E9D2",
+            "enableNotifications": false,
+            "startUrl": "$REPO_PATH/index.html",
             "iconUrl": "$BASE/icon-512.png",
             "maskableIconUrl": "$BASE/icon-512.png",
             "splashScreenFadeOutDuration": 300,
