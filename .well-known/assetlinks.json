@@ -1,1 +1,10 @@
-hhh
+   [
+     {
+       "relation": ["delegate_permission/common.handle_all_urls"],
+       "target": {
+         "namespace": "android_app",
+         "package_name": "io.github.johnzayar.myanmartts",
+         "sha256_cert_fingerprints": ["6D:44:F5:16:71:50:9C:48:DA:EF:0D:FE:6F:E7:37:92:98:62:26:FC:3A:EB:CD:AD:F7:16:AD:BA:9D:FA:4D:C3"]
+       }
+     }
+   ]
