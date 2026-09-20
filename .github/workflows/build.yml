@@ -1,0 +1,138 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  KS_PASS: android-ks-pass-123
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Prepare variables
+        run: |
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          REPO='${{ github.event.repository.name }}'
+          echo "HOST=${OWNER}.github.io" >> $GITHUB_ENV
+          echo "BASE=https://${OWNER}.github.io/${REPO}" >> $GITHUB_ENV
+          echo "REPO_PATH=/${REPO}" >> $GITHUB_ENV
+          PKG="io.github.$(echo "$OWNER" | tr -cd 'a-z0-9').myanmartts"
+          echo "PKG=${PKG}" >> $GITHUB_ENV
+
+      - name: Wait until GitHub Pages is live
+        run: |
+          for i in $(seq 1 30); do
+            M=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/manifest.json")
+            I=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/icon-512.png")
+            echo "try $i: manifest=$M icon=$I"
+            if [ "$M" = "200" ] && [ "$I" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo "GitHub Pages မှာ manifest.json / icon-512.png မတွေ့ပါ။ Settings > Pages ကို စစ်ပါ။"
+          exit 1
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Set up Android SDK (Bubblewrap layout)
+        run: |
+          SDK="$HOME/android-sdk"
+          mkdir -p "$SDK"
+C            "startUrl": "$REPO_PATH/index.html",
+            "iconUrl": "$BASE/icon-512.png",
+            "maskableIconUrl": "$BASE/icon-512.png",
+            "splashScreenFadeOutDuration": 300,
+            "signingKey": { "path": "./android.keystore", "alias": "android" },
+            "appVersionCode": 1,
+            "appVersionName": "1.0.0",
+            "shortcuts": [],
+            "generatorApp": "bubblewrap-cli",
+            "webManifestUrl": "$BASE/manifest.json",
+            "fallbackType": "customtabs",
+            "features": {},
+            "alphaDependencies": { "enabled": false },
+            "enableSiteSettingsShortcut": true,
+            "isChromeOSOnly": false,
+            "isMetaQuest": false,
+            "fullScopeUrl": "$BASE/",
+            "minSdkVersion": 21,
+            "orientation": "default",
+            "displayOverride": [],
+            "additionalTrustedOrigins": [],
+            "retainedBundles": []
+          }
+          EOF2
+
+      - name: Generate Android project
+        working-directory: twa
+        run: bubblewrap update --skipVersionUpgrade
+
+      - name: Build APK
+        working-directory: twa
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: ${{ env.KS_PASS }}
+          BUBBLEWRAP_KEY_PASSWORD: ${{ env.KS_PASS }}
+          ANDROID_HOME: ${{ env.ANDROID_SDK }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK }}
+        run: |
+          set +e
+          bubblewrap build --skipPwaValidation 2>&1 | tee build.log
+          STATUS=${PIPESTATUS[0]}
+          if [ "$STATUS" != "0" ]; then
+            echo ""
+            echo "################ ERROR SUMMARY ################"
+            grep -n -A15 "What went wrong" build.log | head -60
+            grep -n "Caused by" build.log | head -15
+            echo "################ END SUMMARY ##################"
+          fi
+          exit $STATUS
+
+      - name: Prepare assetlinks.json (browser URL bar ဖျောက်ရန်)
+        working-directory: twa
+        run: |
+          # Bubblewrap က ထုတ်ပေးပြီးသားဆိုရင် အဲဒီဖိုင်ကိုသုံး၊ မရှိရင် keystore ကနေ ကိုယ်တိုင်ထုတ်
+          if [ ! -f assetlinks.json ]; then
+            FP=$(keytool -list -v -keystore android.keystore -alias android -storepass "$KS_PASS" | grep -m1 'SHA256:' | sed 's/.*SHA256: *//')
+            cat > assetlinks.json <<EOF2
+          [
+            {
+              "relation": ["delegate_permission/common.handle_all_urls"],
+              "target": {
+                "namespace": "android_app",
+                "package_name": "$PKG",
+                "sha256_cert_fingerprints": ["$FP"]
+              }
+            }
+          ]
+          EOF2
+          fi
+          echo "=========== assetlinks.json ==========="
+          cat assetlinks.json
+          echo "======================================="
+          echo "ဒီဖိုင်ကို https://$HOST/.well-known/assetlinks.json မှာ တင်ထားမှ APK ထဲက browser bar ပျောက်ပါမယ်။"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-apk
+          path: |
+            twa/app-release-signed.apk
+            twa/app-release-bundle.aab
+            twa/assetlinks.json
