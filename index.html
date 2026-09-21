@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#7C2A2A">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="မြန်မာစာဖတ်">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%94%8A%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.json">
+<title>မြန်မာစာဖတ် — Text to Speech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;500;600;700&family=Padauk:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
+<style>
+  :root{
+    --paper:#F3E9D2;
+    --paper-2:#EADFC2;
+    --ink:#2B2016;
+    --ink-soft:#5A4A38;
+    --maroon:#7C2A2A;
+    --maroon-dark:#5C1E1E;
+    --gold:#B8892B;
+    --gold-light:#D9B15C;
+    --line:rgba(43,32,22,0.16);
+    --rec-red:#B5342E;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  html{ background:#E4D6B0; }
+  body{
+    font-family:'Noto Sans Myanmar','Padauk',sans-serif;
+    background:#E4D6B0;
+    color:var(--ink);
+    min-height:100vh;
+    min-height:100dvh;
+    display:flex;
+    justify-content:center;
+    align-items:stretch;
+  }
+
+  /* ---- app shell / phone frame ---- */
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    min-height:100dvh;
+    background:var(--paper);
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 0 40px rgba(0,0,0,0.18);
+    position:relative;
+  }
+  @media (min-width:560px){
+    body{ padding:28px 16px; }
+    .app{
+      min-height:min(860px, 92vh);
+      max-height:92vh;
+      border-radius:32px;
+      overflow:hidden;
+      border:1px solid rgba(43,32,22,0.12);
+    }
+  }
+
+  .masthead{
+    order:0;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:calc(18px + env(safe-area-inset-top)) 20px 18px;
+    background:linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%);
+    color:var(--paper);
+  }
+  .masthead .icon{
+    width:40px; height:40px; border-radius:12px;
+    background:rgba(255,255,255,0.16);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; flex:0 0 auto;
+  }
+  .fs-btn{
+    margin-left:auto; flex:0 0 auto; width:40px; height:40px; padding:0; border-radius:12px;
+    background:rgba(255,255,255,0.16); color:var(--paper); font-size:20px; line-height:1;
+  }
+  .fs-btn:hover{ background:rgba(255,255,255,0.28); }
+  .voice-cards{ display:flex; gap:10px; }
+  .voice-card{
+    flex:1; padding:12px 8px; text-align:center; border-radius:14px;
+    background:var(--paper); border:1px solid var(--line); color:var(--ink);
+  }
+  .voice-card b{ display:block; font-size:17px; font-weight:600; }
+  .voice-card small{ display:block; font-size:11px; color:var(--ink-soft); margin-top:2px; }
+  .voice-card.active{ border-color:var(--maroon); background:rgba(124,42,42,0.09); box-shadow:inset 0 0 0 1px var(--maroon); }
+  .voice-card.active b{ color:var(--maroon-dark); }
+  .masthead h1{ font-size:19px; font-weight:700; margin:0; letter-spacing:0.3px; }
+  .masthead span{ font-size:12px; opacity:0.85; display:block; margin-top:1px; }
+
+  .content-scroll{
+    order:1;
+    flex:1 1 auto;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    padding:16px 16px 8px;
+  }
+
+  .tabs{
+    order:2;
+    flex:0 0 auto;
+    display:flex;
+    gap:0;
+    padding:6px 10px calc(6px + env(safe-area-inset-bottom));
+    background:var(--paper-2);
+    border-top:1px solid var(--line);
+  }
+  .tab{
+    flex:1; text-align:center; padding:9px 4px; font-size:13px; cursor:pointer;
+    color:var(--ink-soft); border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+  }
+  .tab .tab-icon{ font-size:18px; line-height:1; }
+  .tab.active{ color:var(--maroon-dark); font-weight:600; background:rgba(124,42,42,0.10); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px;
+    margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(43,32,22,0.05);
+  }
+  textarea{
+    width:100%; min-height:130px; resize:vertical;
+    font-family:'Noto Sans Myanmar','Padauk',sans-serif; font-size:18px; line-height:1.8;
+    color:var(--ink); background:var(--paper); border:1px solid var(--line);
+    border-radius:12px; padding:14px; outline:none;
+  }
+  textarea:focus{ border-color:var(--gold); }
+  input[type=text], input[type=password]{
+    font-family:'Noto Sans Myanmar','Padauk',sans-serif; font-size:15px; color:var(--ink);
+    background:var(--paper); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; width:100%;
+  }
+  input[type=text]:focus, input[type=password]:focus{ border-color:var(--gold); outline:none; }
+  .row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:8px; font-size:12px; color:var(--ink-soft);
+  }
+  .field{ margin-top:16px; }
+  .field label{ display:block; font-size:13px; color:var(--ink-soft); margin-bottom:6px; }
+  select{
+    width:100%; font-family:'Noto Sans Myanmar','Padauk',sans-serif; font-size:14px;
+    color:var(--ink); background:var(--paper); border:1px solid var(--line);
+    border-radius:10px; padding:9px 10px;
+  }
+  .chip-row{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .chip{
+    font-size:12px; padding:6px 13px; border-radius:16px; cursor:pointer;
+    border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+  }
+  .chip.active{ background:var(--maroon); border-color:var(--maroon); color:var(--paper); }
+  .sliders{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .slider-field label{ display:flex; justify-content:space-between; font-size:13px; color:var(--ink-soft); margin-bottom:6px; }
+  input[type=range]{ width:100%; accent-color:var(--maroon); }
+  .controls{ display:flex; gap:10px; margin-top:20px; }
+  button{
+    font-family:'Noto Sans Myanmar','Padauk',sans-serif; font-size:15px; border:none;
+    border-radius:12px; padding:13px 20px; cursor:pointer;
+  }
+  .btn-speak{ background:var(--maroon); color:var(--paper); flex:1; box-shadow:0 3px 10px rgba(124,42,42,0.3); }
+  .btn-speak:hover{ background:var(--maroon-dark); }
+  .btn-speak:disabled{ background:#c9bda3; box-shadow:none; cursor:not-allowed; }
+  .btn-stop{ background:transparent; color:var(--maroon-dark); border:1px solid var(--maroon); }
+  .btn-stop:hover{ background:rgba(124,42,42,0.08); }
+  .btn-small{ font-size:12px; padding:8px 13px; border-radius:10px; }
+  .btn-outline{ background:transparent; border:1px solid var(--gold); color:var(--maroon-dark); }
+  .btn-outline:hover{ background:rgba(184,137,43,0.1); }
+  .btn-record{ background:var(--rec-red); color:var(--paper); }
+  .btn-record.recording{ background:var(--maroon-dark); }
+  .notice{
+    font-size:12px; line-height:1.6; color:var(--ink-soft); border-left:3px solid var(--gold);
+    padding:9px 12px; background:rgba(184,137,43,0.08); border-radius:0 10px 10px 0; margin-top:16px;
+  }
+  .notice.warn{ border-left-color:var(--maroon); background:rgba(124,42,42,0.07); }
+  .notice a{ color:var(--maroon-dark); }
+  .add-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .add-row input[type=text]{ flex:1; min-width:140px; }
+  .bank-list{ margin-top:16px; border-top:1px solid var(--line); }
+  .bank-item{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line); }
+  .bank-item .word{ flex:1; font-size:16px; }
+  .bank-item .type-badge{
+    font-size:11px; padding:3px 9px; border-radius:10px;
+    background:rgba(124,42,42,0.12); color:var(--maroon-dark);
+  }
+  .bank-item .actions{ display:flex; gap:6px; }
+  .icon-btn{
+    background:var(--paper); border:1px solid var(--line); color:var(--ink-soft);
+    padding:6px 10px; font-size:12px; border-radius:8px;
+  }
+  .icon-btn:hover{ border-color:var(--gold); color:var(--maroon-dark); }
+  .empty{ padding:18px 0; color:var(--ink-soft); font-size:13px; text-align:center; }
+  .io-row{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  select.type-select{ width:auto; min-width:120px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="masthead">
+    <div class="icon">🔊</div>
+    <div>
+      <h1>မြန်မာစာဖတ်</h1>
+      <span>Text to Speech</span>
+    </div>
+    <button class="fs-btn" id="fs-btn" title="Browser bar ဖျောက်ရန် (Fullscreen)" aria-label="Fullscreen">⤢</button>
+  </div>
+
+  <div class="content-scroll">
+  <div class="view active" id="view-read">
+    <div class="panel">
+      <textarea id="text" placeholder="ဒီနေရာမှာ မြန်မာစာ ရိုက်ထည့်ပါ...">မင်္ဂလာပါ။ ဒါက မြန်မာစာဖတ် အက်ပ်လေးပါ။</textarea>
+      <div class="row">
+        <span id="charcount">0 လုံးရေ</span>
+        <span id="status"></span>
+      </div>
+
+      <div class="field">
+        <label>Gemini AI အသံ (အကောင်းဆုံးအရည်အသွေး — API key လိုအပ်သည်)</label>
+        <div class="add-row">
+          <input type="password" id="gemini-key" placeholder="Gemini API key ထည့်ပါ">
+          <select id="gemini-voice" class="type-select">
+            <option value="Puck">ဇော်ဇော် (အမျိုးသား၊ တက်ကြွသည့်အသံ)</option>
+            <option value="Orus">ဦးမြင့် (အမျိုးသား၊ အသက်ကြီး၊ တည်ကြည်သည့်အသံ)</option>
+            <option value="Charon">ကိုကို (အမျိုးသား၊ ရှင်းလင်းသည့်အသံ)</option>
+            <option value="Fenrir">မောင်မောင် (အမျိုးသား၊ တက်ကြွရွှင်လန်းသည့်အသံ)</option>
+            <option value="Aoede">ပပ (အမျိုးသမီး၊ ပေါ့ပေါ့ပါးပါးအသံ)</option>
+            <option value="Kore">ဒေါ်ဝိုင်း (အမျိုးသမီး၊ အသက်ကြီး၊ တည်ကြည်သည့်အသံ)</option>
+            <option value="Leda">မေမေ (အမျိုးသမီး၊ ငယ်ရွယ်တက်ကြွသည့်အသံ)</option>
+            <option value="Zephyr">သီတာ (အမျိုးသမီး၊ ပွင့်လင်းရွှင်လန်းသည့်အသံ)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-top:12px;">
+          <label>အသံပုံစံ</label>
+          <select id="gemini-style">
+            <option value="normal">ပုံမှန်အသံ</option>
+            <option value="news">သတင်းကြေညာသံ</option>
+            <option value="story">ပုံပြောသံ</option>
+            <option value="narrative">ဇာတ်ကြောင်းပြောသံ</option>
+            <option value="teaching">စာသင်ပြသံ</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);">
+            <input type="checkbox" id="gemini-save-key" checked style="width:auto;"> ဒီ key ကို ဒီစက်ပေါ်မှာသာ မှတ်ထားမည်
+          </label>
+        </div>
+        <div class="controls" style="margin-top:10px;">
+          <button class="btn-outline" id="gemini-generate" style="flex:1;">Gemini အသံနဲ့ ထုတ်ပါ</button>
+          <button class="icon-btn" id="clear-external">ဖယ်ရှားမည်</button>
+        </div>
+        <div class="notice" id="gemini-notice">API key ကို <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> မှာ အခမဲ့ရနိုင်ပါတယ်။ key ကို ဒီဖိုင်ထဲက JavaScript ကနေ တိုက်ရိုက် Google ဆာဗာဆီ ပို့တာဖြစ်လို့ (server ကြားခံမရှိ) — ကိုယ်ပိုင် key ကိုပဲ ထည့်သုံးပါ၊ ဒီဖိုင်ကို တခြားသူနဲ့ မမျှဝေပါနဲ့ (browser devtools ကနေ key ကို မြင်နိုင်ပါတယ်)။</div>
+      </div>
+
+      <details style="margin-top:16px;">
+        <summary style="cursor:pointer; font-size:13px; color:var(--ink-soft); padding:6px 0;">⚙️ အခြား ဆက်တင်များ (အမြန်နှုန်း / အသံနေအသံထား — သီဟ/နီလာ နဲ့ browser default အသံအတွက်)</summary>
+
+      <div class="field">
+        <label>အသံ ရွေးချယ်ရန် (ကိုယ်ပိုင်အသံ/Gemini မရှိသေးသော စာလုံးများအတွက်)</label>
+        <select id="voice"></select>
+      </div>
+
+      <div class="field">
+        <label>ကိုယ်ပိုင်အသံ ပရိုဖိုင် ဦးစားပေး</label>
+        <select id="profile-pref">
+          <option value="all">သိမ်းထားသမျှ မှန်သမျှသုံးမည်</option>
+        </select>
+      </div>
+
+      <div class="sliders">
+        <div class="slider-field">
+          <label>အမြန်နှုန်း <span id="rate-val">1.0</span></label>
+          <input type="range" id="rate" min="0.5" max="1.6" step="0.1" value="1">
+        </div>
+        <div class="slider-field">
+          <label>အသံနေအသံထား <span id="pitch-val">1.0</span></label>
+          <input type="range" id="pitch" min="0.5" max="1.6" step="0.1" value="1">
+        </div>
+      </div>
+      </details>
+
+      <div class="controls">
+        <button class="btn-speak" id="speak">အသံဖတ်ပါ</button>
+        <button class="btn-stop" id="stop">ရပ်ပါ</button>
+      </div>
+      <div class="controls">
+        <button class="btn-outline btn-small" id="download-mp3" style="flex:1;">🔽 လက်ရှိအသံကို MP3 Download ဆွဲမည်</button>
+      </div>
+
+      <div class="notice" id="voice-notice"></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-bank">
+    <div class="panel">
+      <div class="field" style="margin-top:0;">
+        <label>စကားလုံး/စကားစု အသစ်ထည့်ရန်</label>
+        <div class="add-row">
+          <input type="text" id="new-phrase" placeholder="ဥပမာ- မင်္ဂလာပါ">
+          <select id="new-type" class="type-select">
+            <option value="male">ယောက်ျားသံ</option>
+            <option value="female">မိန်းမသံ</option>
+            <option value="elder">လူကြီးသံ</option>
+            <option value="child">ကလေးသံ</option>
+            <option value="other">အခြား</option>
+          </select>
+          <button class="btn-record btn-small" id="record-btn">အသံသွင်းမည်</button>
+        </div>
+      </div>
+      <div class="notice" id="rec-notice">
+        မိုက်ခရိုဖုန်းခွင့်ပြုချက် လိုအပ်ပါမည်။ စကားလုံးရိုက်ထည့်ပြီး အသံအမျိုးအစားရွေးကာ "အသံသွင်းမည်" ကိုနှိပ်ပါ၊ ထပ်နှိပ်ပါက ရပ်ပါမည်။ တူညီသည့်စကားလုံးကို အသံအမျိုးအစားအမျိုးမျိုးနဲ့ ထပ်သွင်းနိုင်ပါသည် (ဥပမာ - "မင်္ဂလာပါ" ကို ယောက်ျားသံ၊ မိန်းမသံ နှစ်မျိုးလုံး သိမ်းထားနိုင်သည်)။ စာဖတ်ရန်စာမျက်နှာတွင် ပရိုဖိုင်ရွေးပြီး ဖတ်ခိုင်းနိုင်ပါသည်။
+      </div>
+
+      <div class="bank-list" id="bank-list"></div>
+
+      <div class="io-row">
+        <button class="btn-outline btn-small" id="export-btn">အသံဘဏ် ထုတ်ယူမည် (.json)</button>
+        <button class="btn-outline btn-small" id="import-btn">အသံဘဏ် တင်သွင်းမည်</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none;">
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-movie">
+    <div class="panel">
+      <div class="field" style="margin-top:0;">
+        <label>Movie ဖိုင် (mp4) တင်ရန်</label>
+        <input type="file" id="movie-file" accept="video/*">
+      </div>
+      <div class="notice" id="movie-notice">
+        Gemini API key ကို "စာဖတ်ရန်" tab ထဲက "Gemini AI အသံ" အပိုင်းမှာ အရင်ထည့်ထားပါ (ဒီနေရာက ချိတ်ဆက်သုံးပါမည်)။ Movie ဖိုင်ကို Gemini ဆီ တင်ပြီး ဇာတ်ကြောင်းကို ကြည့်ကာ မြန်မာလို အနှစ်ချုပ် (recap) စာသား ရေးပေးမှာဖြစ်ပါတယ်၊ ပြီးရင် အလိုအလျောက် အသံထုတ်ပေးပါမည်။
+        <br><br>
+        <b>သတိပြုရန်</b> — ရုပ်ရှင်ဖိုင် အရွယ်အစားကြီးလေ၊ အချိန်ကြာလေ၊ Gemini API ကုန်ကျစရိတ် ပိုများလေ ဖြစ်ပါတယ် (video minute အလိုက် token ကုန်ကျသည်)။ မိနစ် ၁၀–၂၀ အတွင်း clip အတို/trailer/scene တွေနဲ့ စမ်းကြည့်ဖို့ အကြံပြုပါတယ်။ ဖိုင် 2GB အောက်ရှိရပါမည်၊ Gemini ပေါ်မှာ ၄၈ နာရီအတွင်း အလိုအလျောက် ပျက်သွားပါလိမ့်မယ်။
+      </div>
+      <div class="controls">
+        <button class="btn-speak" id="movie-recap-btn" style="flex:1;">Movie Recap ထုတ်ရန်</button>
+      </div>
+      <div class="row"><span id="movie-status"></span></div>
+    </div>
+  </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="read"><span class="tab-icon">🔊</span>စာဖတ်ရန်</div>
+    <div class="tab" data-tab="bank"><span class="tab-icon">🎙️</span>ကိုယ်ပိုင်အသံ</div>
+    <div class="tab" data-tab="movie"><span class="tab-icon">🎬</span>Movie Recap</div>
+  </div>
+</div>
+
+<script>
+/* ---------- tab switching ---------- */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('view-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- reader (system voice) ---------- */
+const textEl = document.getElementById('text');
+const charcount = document.getElementById('charcount');
+const voiceSel = document.getElementById('voice');
+const rateEl = document.getElementById('rate');
+const pitchEl = document.getElementById('pitch');
+const rateVal = document.getElementById('rate-val');
+const pitchVal = document.getElementById('pitch-val');
+const speakBtn = document.getElementById('speak');
+const stopBtn = document.getElementById('stop');
+const statusEl = document.getElementById('status');
+const noticeEl = document.getElementById('voice-notice');
+const profilePrefEl = document.getElementById('profile-pref');
+
+function updateCount(){ charcount.textContent = textEl.value.length + ' လုံးရေ'; }
+textEl.addEventListener('input', updateCount);
+updateCount();
+
+rateEl.addEventListener('input', () => rateVal.textContent = parseFloat(rateEl.value).toFixed(1));
+pitchEl.addEventListener('input', () => pitchVal.textContent = parseFloat(pitchEl.value).toFixed(1));
+
+let voices = [];
+let myanmarVoices = [];
+const GENERIC_VOICE_NAMES = ['ဇော်ဇော်','ကျော်ကျော်','သီဟ','အေးအေး','သီတာ','မိုးမိုး'];
+
+function loadVoices(){
+  voices = window.speechSynthesis.getVoices();
+  myanmarVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('my'));
+  populateVoiceSelect();
+
+  if(myanmarVoices.length){
+    noticeEl.classList.remove('warn');
+    noticeEl.textContent = 'သင့်စက်ပေါ်တွင် မြန်မာအသံ ' + myanmarVoices.length + ' မျိုး တွေ့ရှိပါသည်။';
+  } else {
+    noticeEl.classList.add('warn');
+    noticeEl.textContent = 'သင့်စက်/ဘရောက်ဆာပေါ်တွင် မြန်မာဘာသာအသံ တိုက်ရိုက်မတွေ့ပါ။ "ကိုယ်ပိုင်အသံ" tab မှာ စကားလုံးများကို ကိုယ်တိုင်အသံသွင်းထားပြီး သုံးနိုင်ပါသည်။ (iOS/macOS: Settings > Accessibility > Spoken Content, Android: Google TTS ဆက်တင်ထဲတွင် Burmese အသံ ဒေါင်းလုဒ်လုပ်နိုင်ပါသည်)';
+  }
+}
+
+function populateVoiceSelect(){
+  const listToShow = myanmarVoices.length ? myanmarVoices : voices;
+  const curated = listToShow.slice(0, GENERIC_VOICE_NAMES.length);
+
+  voiceSel.innerHTML = '';
+  if(!curated.length){
+    const opt = document.createElement('option');
+    opt.textContent = 'အသံ မတွေ့ပါ';
+    voiceSel.appendChild(opt);
+  } else {
+    curated.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = v.name;
+      opt.textContent = GENERIC_VOICE_NAMES[i] || v.name;
+      voiceSel.appendChild(opt);
+    });
+  }
+}
+
+window.speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function speakWithSystem(text){
+  return new Promise(resolve => {
+    if(!text.trim()){ resolve(); return; }
+    const utter = new SpeechSynthesisUtterance(text);
+    const listToShow = myanmarVoices.length ? myanmarVoices : voices;
+    const chosen = listToShow.find(v => v.name === voiceSel.value);
+    if(chosen){ utter.voice = chosen; utter.lang = chosen.lang; }
+    else { utter.lang = 'my-MM'; }
+    utter.rate = parseFloat(rateEl.value);
+    utter.pitch = parseFloat(pitchEl.value);
+    utter.onend = resolve;
+    utter.onerror = resolve;
+    window.speechSynthesis.speak(utter);
+  });
+}
+
+let stopRequested = false;
+let currentAudio = null;
+let externalAudioDataUrl = null;
+
+let externalAudioText = null;
+let externalAudioIsMp3 = false;
+
+/* ---------- Gemini TTS API ---------- */
+const geminiKeyEl = document.getElementById('gemini-key');
+const geminiVoiceEl = document.getElementById('gemini-voice');
+const geminiStyleEl = document.getElementById('gemini-style');
+const geminiSaveKeyEl = document.getElementById('gemini-save-key');
+const geminiGenerateBtn = document.getElementById('gemini-generate');
+const geminiNoticeEl = document.getElementById('gemini-notice');
+const GEMINI_KEY_STORAGE = 'myanmar-tts-gemini-key';
+const GEMINI_DEFAULT_NOTICE = geminiNoticeEl.innerHTML;
+
+try{
+  const savedKey = localStorage.getItem(GEMINI_KEY_STORAGE);
+  if(savedKey){ geminiKeyEl.value = savedKey; }
+} catch(e){ /* localStorage unavailable, ignore */ }
+
+function base64ToBytes(base64){
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for(let i = 0; i < binary.length; i++){ bytes[i] = binary.charCodeAt(i); }
+  return bytes;
+}
+
+function pcm16ToWavDataUrl(pcmBytes, sampleRate, channels){
+  const bitDepth = 16;
+  const blockAlign = channels * bitDepth / 8;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = pcmBytes.length;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+
+  function writeStr(offset, str){ for(let i=0;i<str.length;i++){ view.setUint8(offset+i, str.charCodeAt(i)); } }
+
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  writeStr(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  new Uint8Array(buffer, 44).set(pcmBytes);
+
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
+}
+
+async function generateWithGemini(){
+  const key = geminiKeyEl.value.trim();
+  const text = textEl.value.trim();
+  if(!key){
+    geminiNoticeEl.classList.add('warn');
+    geminiNoticeEl.textContent = 'API key အရင်ထည့်ပါ။';
+    return;
+  }
+  if(!text){
+    geminiNoticeEl.classList.add('warn');
+    geminiNoticeEl.textContent = 'စာသားရိုက်ထည့်ပါ။';
+    return;
+  }
+
+  try{
+    if(geminiSaveKeyEl.checked){ localStorage.setItem(GEMINI_KEY_STORAGE, key); }
+    else { localStorage.removeItem(GEMINI_KEY_STORAGE); }
+  } catch(e){ /* ignore */ }
+
+  geminiGenerateBtn.disabled = true;
+  geminiGenerateBtn.textContent = 'ထုတ်နေသည်...';
+  geminiNoticeEl.classList.remove('warn');
+  geminiNoticeEl.textContent = 'Gemini ကို ခေါ်နေသည်၊ ခဏစောင့်ပါ...';
+
+  const model = 'gemini-2.5-flash-preview-tts';
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent';
+
+  const STYLE_INSTRUCTIONS = {
+    normal: 'Say the following clearly and naturally in Burmese (Myanmar language), with correct tones and pronunciation:',
+    news: 'Say the following in a formal, crisp, authoritative Burmese TV news-anchor tone, like reading an evening news broadcast, with correct Burmese tones and pronunciation:',
+    story: 'Say the following in a warm, gentle, soothing Burmese storytelling voice, like a parent telling a bedtime tale to a child, with correct Burmese tones and pronunciation:',
+    narrative: 'Say the following in an expressive, dramatic Burmese narrator voice, like narrating the plot of a film or novel, with correct Burmese tones and pronunciation:',
+    teaching: 'Say the following in a clear, patient, encouraging Burmese teacher\'s voice, like a teacher explaining a lesson to students in a classroom, with correct Burmese tones and pronunciation:'
+  };
+  const styleKey = geminiStyleEl.value;
+  const prompt = (STYLE_INSTRUCTIONS[styleKey] || STYLE_INSTRUCTIONS.normal) + ' ' + text;
+
+  try{
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: geminiVoiceEl.value } } }
+        }
+      })
+    });
+
+    const data = await res.json();
+
+    if(!res.ok){
+      const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+
+    const part = data && data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0];
+    const inline = part && part.inlineData;
+    if(!inline || !inline.data){ throw new Error('အသံဒေတာ ပြန်မရပါ'); }
+
+    let rate = 24000;
+    const mt = inline.mimeType || '';
+    const rateMatch = mt.match(/rate=(\d+)/);
+    if(rateMatch){ rate = parseInt(rateMatch[1], 10); }
+
+    const pcmBytes = base64ToBytes(inline.data);
+    const wavUrl = pcm16ToWavDataUrl(pcmBytes, rate, 1);
+
+    externalAudioDataUrl = wavUrl;
+    externalAudioText = text;
+    externalAudioIsMp3 = false;
+
+    geminiNoticeEl.classList.remove('warn');
+    geminiNoticeEl.textContent = 'ပြီးပါပြီ! "အသံဖတ်ပါ" ကို နှိပ်ပါ။';
+
+    await playCustom({ dataUrl: wavUrl });
+  } catch(err){
+    geminiNoticeEl.classList.add('warn');
+    geminiNoticeEl.textContent = 'အမှားရှိသည်: ' + err.message;
+  } finally{
+    geminiGenerateBtn.disabled = false;
+    geminiGenerateBtn.textContent = 'Gemini အသံနဲ့ ထုတ်ပါ';
+  }
+}
+geminiGenerateBtn.addEventListener('click', generateWithGemini);
+
+/* ---------- MP3 download (works on any audio: recordings, uploads, Gemini output) ---------- */
+async function downloadAsMp3(sourceUrl, filename){
+  const dlNotice = document.getElementById('voice-notice');
+  try{
+    const resp = await fetch(sourceUrl);
+    const arrayBuffer = await resp.arrayBuffer();
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    const sampleRate = audioBuffer.sampleRate;
+    const channelData = audioBuffer.getChannelData(0);
+
+    const int16 = new Int16Array(channelData.length);
+    for(let i = 0; i < channelData.length; i++){
+      let s = Math.max(-1, Math.min(1, channelData[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+
+    const mp3Encoder = new lamejs.Mp3Encoder(1, sampleRate, 96);
+    const blockSize = 1152;
+    const mp3Data = [];
+    for(let i = 0; i < int16.length; i += blockSize){
+      const chunk = int16.subarray(i, i + blockSize);
+      const mp3buf = mp3Encoder.encodeBuffer(chunk);
+      if(mp3buf.length > 0){ mp3Data.push(mp3buf); }
+    }
+    const endBuf = mp3Encoder.flush();
+    if(endBuf.length > 0){ mp3Data.push(endBuf); }
+
+    const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'audio.mp3';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch(err){
+    dlNotice.classList.add('warn');
+    dlNotice.textContent = 'MP3 ပြောင်းရာတွင် အမှားရှိသည်: ' + err.message;
+  }
+}
+
+document.getElementById('download-mp3').addEventListener('click', () => {
+  const dlNotice = document.getElementById('voice-notice');
+  if(!externalAudioDataUrl){
+    dlNotice.classList.add('warn');
+    dlNotice.textContent = 'Download ချရန် အသံ မရှိသေးပါ — အပေါ်က Gemini AI နဲ့ အသံအရင်ထုတ်ပါ။ ကိုယ်ပိုင်အသံသိမ်းထားသော စကားလုံးတစ်ခုချင်းစီကိုတော့ "ကိုယ်ပိုင်အသံ" tab ထဲက MP3 ခလုတ်ကနေ download ချနိုင်ပါသည်။';
+    return;
+  }
+  downloadAsMp3(externalAudioDataUrl, 'myanmar-tts.mp3');
+});
+
+/* ---------- Movie recap (mp4 -> Gemini video understanding -> Burmese recap -> Gemini TTS) ---------- */
+const movieFileEl = document.getElementById('movie-file');
+const movieRecapBtn = document.getElementById('movie-recap-btn');
+const movieNoticeEl = document.getElementById('movie-notice');
+const movieStatusEl = document.getElementById('movie-status');
+const MOVIE_DEFAULT_NOTICE = movieNoticeEl.innerHTML;
+
+async function uploadFileResumable(file, apiKey, onProgress){
+  const startRes = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files', {
+    method: 'POST',
+    headers: {
+      'x-goog-api-key': apiKey,
+      'X-Goog-Upload-Protocol': 'resumable',
+      'X-Goog-Upload-Command': 'start',
+      'X-Goog-Upload-Header-Content-Length': String(file.size),
+      'X-Goog-Upload-Header-Content-Type': file.type || 'video/mp4',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ file: { display_name: file.name } })
+  });
+  if(!startRes.ok){ throw new Error('Upload စတင်ရာတွင် အမှားရှိသည် (HTTP ' + startRes.status + ')'); }
+  const uploadUrl = startRes.headers.get('x-goog-upload-url');
+  if(!uploadUrl){ throw new Error('Upload URL မရရှိပါ'); }
+
+  if(onProgress) onProgress('ဖိုင်ကို Gemini ဆီ တင်နေသည်...');
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Length': String(file.size),
+      'X-Goog-Upload-Offset': '0',
+      'X-Goog-Upload-Command': 'upload, finalize'
+    },
+    body: file
+  });
+  if(!uploadRes.ok){ throw new Error('ဖိုင်တင်ရာတွင် အမှားရှိသည် (HTTP ' + uploadRes.status + ')'); }
+  const uploadData = await uploadRes.json();
+  return uploadData.file;
+}
+
+async function waitForFileActive(fileName, apiKey, onProgress){
+  let state = 'PROCESSING';
+  let fileInfo = null;
+  while(state === 'PROCESSING'){
+    await new Promise(r => setTimeout(r, 4000));
+    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/' + fileName, {
+      headers: { 'x-goog-api-key': apiKey }
+    });
+    fileInfo = await res.json();
+    state = fileInfo.state;
+    if(onProgress) onProgress('Gemini က ဗီဒီယိုကို ပြင်ဆင်နေသည် (' + state + ')...');
+  }
+  if(state !== 'ACTIVE'){ throw new Error('ဖိုင် အသုံးပြုနိုင်သောအခြေအနေ မရောက်ပါ (state: ' + state + ')'); }
+  return fileInfo;
+}
+
+async function generateMovieRecap(){
+  const apiKey = geminiKeyEl.value.trim();
+  const file = movieFileEl.files[0];
+
+  if(!apiKey){
+    movieNoticeEl.classList.add('warn');
+    movieNoticeEl.textContent = '"စာဖတ်ရန်" tab ထဲက Gemini API key ကို အရင်ထည့်ပါ။';
+    return;
+  }
+  if(!file){
+    movieNoticeEl.classList.add('warn');
+    movieNoticeEl.textContent = 'Movie ဖိုင် (mp4) ကို အရင်ရွေးပါ။';
+    return;
+  }
+  if(file.size > 2 * 1024 * 1024 * 1024){
+    movieNoticeEl.classList.add('warn');
+    movieNoticeEl.textContent = 'ဖိုင်အရွယ်အစား 2GB ထက်ကြီးနေပါသည် — Gemini က လက်ခံနိုင်သည့် အများဆုံးအရွယ်အစားထက် ကျော်နေပါသည်။';
+    return;
+  }
+
+  movieRecapBtn.disabled = true;
+  movieNoticeEl.classList.remove('warn');
+
+  try{
+    movieStatusEl.textContent = 'ဖိုင်တင်နေသည်...';
+    const uploadedFile = await uploadFileResumable(file, apiKey, msg => { movieStatusEl.textContent = msg; });
+
+    movieStatusEl.textContent = 'Gemini က ဗီဒီယိုကို ပြင်ဆင်နေသည်...';
+    const activeFile = await waitForFileActive(uploadedFile.name, apiKey, msg => { movieStatusEl.textContent = msg; });
+
+    movieStatusEl.textContent = 'ဇာတ်ကြောင်း အနှစ်ချုပ် ရေးနေသည်...';
+    const model = 'gemini-3.6-flash';
+    const genRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { file_data: { mime_type: activeFile.mimeType, file_uri: activeFile.uri } },
+            { text: 'ဒီဗီဒီယိုကို ကြည့်ပြီး၊ ဇာတ်ကြောင်းအနှစ်ချုပ် (movie recap) ကို မြန်မာဘာသာနဲ့ စာပိုဒ် ၃-၅ ပိုဒ်အတွင်း ရေးပါ။ ဇာတ်ကြောင်း အဓိကအချက်များ၊ ဇာတ်ကောင်များ၊ ဖြစ်ရပ်အစဉ်လိုက်ကို ဖော်ပြပြီး၊ ပရိသတ်ကို ဆွဲဆောင်နိုင်တဲ့၊ ပြောပြသလိုမျိုး စာသားဖြင့် ရေးပါ။ မြန်မာစာလုံးများသာ အသုံးပြုပါ။' }
+          ]
+        }]
+      })
+    });
+    const genData = await genRes.json();
+    if(!genRes.ok){
+      const msg = (genData && genData.error && genData.error.message) ? genData.error.message : ('HTTP ' + genRes.status);
+      throw new Error(msg);
+    }
+    const recapText = genData.candidates && genData.candidates[0] && genData.candidates[0].content && genData.candidates[0].content.parts && genData.candidates[0].content.parts[0] && genData.candidates[0].content.parts[0].text;
+    if(!recapText){ throw new Error('Recap စာသား ပြန်မရပါ'); }
+
+    textEl.value = recapText.trim();
+    updateCount();
+
+    movieStatusEl.textContent = 'Recap အသံ ထုတ်နေသည်...';
+    await generateWithGemini();
+
+    movieStatusEl.textContent = 'ပြီးပါပြီ! "စာဖတ်ရန်" tab ထဲမှာ recap စာသားနဲ့ အသံကို ကြည့်နိုင်ပါသည်။';
+  } catch(err){
+    movieNoticeEl.classList.add('warn');
+    movieNoticeEl.textContent = 'အမှားရှိသည်: ' + err.message;
+    movieStatusEl.textContent = '';
+  } finally{
+    movieRecapBtn.disabled = false;
+  }
+}
+movieRecapBtn.addEventListener('click', generateMovieRecap);
+
+const clearExternalBtn = document.getElementById('clear-external');
+clearExternalBtn.addEventListener('click', () => {
+  externalAudioDataUrl = null;
+  externalAudioText = null;
+  externalAudioIsMp3 = false;
+  geminiNoticeEl.classList.remove('warn');
+  geminiNoticeEl.textContent = 'အသံကို ဖယ်ရှားလိုက်ပါပြီ — "အသံဖတ်ပါ" ကိုနှိပ်ရင် ပုံမှန် (ကိုယ်ပိုင်အသံ/browser default) စနစ်ကို ပြန်သုံးပါလိမ့်မယ်။';
+});
+
+async function speakAll(){
+  const text = textEl.value.trim();
+  if(!text && !externalAudioDataUrl){ statusEl.textContent = 'စာသားရိုက်ထည့်ပါ'; return; }
+  stopRequested = false;
+  speakBtn.disabled = true;
+  statusEl.textContent = 'ဖတ်နေသည်...';
+
+  const useExternal = externalAudioDataUrl && (externalAudioText === null || externalAudioText === text || !text);
+  if(useExternal){
+    await playCustom({ dataUrl: externalAudioDataUrl });
+    statusEl.textContent = '';
+    speakBtn.disabled = false;
+    return;
+  }
+
+  const preferredType = profilePrefEl.value;
+  const tokens = tokenizeWithBank(text, preferredType);
+
+  for(const tok of tokens){
+    if(stopRequested) break;
+    if(tok.type === 'custom'){
+      await playCustom(tok.entry);
+    } else {
+      await speakWithSystem(tok.text);
+    }
+  }
+
+  statusEl.textContent = '';
+  speakBtn.disabled = false;
+}
+
+function playCustom(entry){
+  return new Promise(resolve => {
+    const audio = new Audio(entry.dataUrl);
+    currentAudio = audio;
+    audio.onended = resolve;
+    audio.onerror = resolve;
+    audio.play().catch(resolve);
+  });
+}
+
+speakBtn.addEventListener('click', speakAll);
+stopBtn.addEventListener('click', () => {
+  stopRequested = true;
+  window.speechSynthesis.cancel();
+  if(currentAudio){ currentAudio.pause(); currentAudio = null; }
+  statusEl.textContent = '';
+  speakBtn.disabled = false;
+});
+
+/* ---------- custom voice bank ---------- */
+let bank = [];
+const TYPE_LABELS = { male:'ယောက်ျားသံ', female:'မိန်းမသံ', elder:'လူကြီးသံ', child:'ကလေးသံ', other:'အခြား' };
+
+function getEntriesByPhrase(phrase){
+  return bank.filter(e => e.phrase === phrase);
+}
+
+function pickEntry(phrase, preferredType){
+  const matches = getEntriesByPhrase(phrase);
+  if(!matches.length) return null;
+  if(preferredType && preferredType !== 'all'){
+    const byType = matches.find(e => e.voiceType === preferredType);
+    if(byType) return byType;
+  }
+  return matches[0];
+}
+
+function tokenizeWithBank(text, preferredType){
+  const arr = text.split(/\s+/).filter(w => w.length);
+  const maxLen = bank.reduce((m, e) => Math.max(m, e.phrase.split(/\s+/).length), 1);
+  const tokens = [];
+  let buffer = '';
+  let idx = 0;
+  while(idx < arr.length){
+    let matched = null;
+    for(let len = Math.min(maxLen, arr.length - idx); len >= 1; len--){
+      const candidate = arr.slice(idx, idx + len).join(' ');
+      const entry = pickEntry(candidate, preferredType);
+      if(entry){ matched = { entry, len }; break; }
+    }
+    if(matched){
+      if(buffer.trim()){ tokens.push({ type:'system', text: buffer }); buffer = ''; }
+      tokens.push({ type:'custom', entry: matched.entry });
+      idx += matched.len;
+    } else {
+      buffer += arr[idx] + ' ';
+      idx += 1;
+    }
+  }
+  if(buffer.trim()){ tokens.push({ type:'system', text: buffer }); }
+  return tokens;
+}
+
+function refreshProfileOptions(){
+  const typesInUse = Array.from(new Set(bank.map(e => e.voiceType)));
+  const current = profilePrefEl.value;
+  profilePrefEl.innerHTML = '<option value="all">သိမ်းထားသမျှ မှန်သမျှသုံးမည်</option>';
+  typesInUse.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = TYPE_LABELS[t] || t;
+    profilePrefEl.appendChild(opt);
+  });
+  if(typesInUse.includes(current)) profilePrefEl.value = current;
+}
+
+const newPhraseEl = document.getElementById('new-phrase');
+const newTypeEl = document.getElementById('new-type');
+const recordBtn = document.getElementById('record-btn');
+const bankListEl = document.getElementById('bank-list');
+const recNotice = document.getElementById('rec-notice');
+
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let mediaStream = null;
+let micUnavailableReason = null;
+
+if(!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+  micUnavailableReason = 'ဒီ app ကို ဖုန်း/ကွန်ပျူတာထဲက ဖိုင်ကို တိုက်ရိုက်ဖွင့်ထားလို့ (https/localhost မဟုတ်ဘဲ content:// သို့မဟုတ် file:// နဲ့ ဖွင့်ထားလို့) ဖြစ်ပါတယ် — ဘရောက်ဆာလုံခြုံရေးစည်းမျဉ်းအရ mic ကို https link ကနေမှသာ ခွင့်ပြုပါတယ်။ ဖြေရှင်းဖို့: app.netlify.com/drop ကို browser ထဲက ဖွင့်ပြီး ဒီ .html ဖိုင်ကို drag & drop တင်လိုက်ပါ (login/signup မလိုပါ) — https link တစ်ခု ချက်ချင်းရပါလိမ့်မယ်၊ အဲဒီ link ကို ဖွင့်ရင် mic အလုပ်လုပ်ပါလိမ့်မယ်။';
+  recNotice.classList.add('warn');
+  recNotice.textContent = micUnavailableReason;
+}
+
+async function toggleRecord(){
+  const phrase = newPhraseEl.value.trim();
+  const voiceType = newTypeEl.value;
+  if(!phrase){
+    recNotice.classList.add('warn');
+    recNotice.textContent = 'အသံသွင်းမည့် စကားလုံး/စကားစုကို အရင်ရိုက်ထည့်ပါ။';
+    return;
+  }
+  if(micUnavailableReason){
+    recNotice.classList.add('warn');
+    recNotice.textContent = micUnavailableReason;
+    return;
+  }
+
+  if(!isRecording){
+    try{
+      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(err){
+      recNotice.classList.add('warn');
+      recNotice.textContent = 'မိုက်ခရိုဖုန်းကို အသုံးပြုခွင့်မရပါ။ ဘရောက်ဆာက ခွင့်ပြုချက်တောင်းသည့်အခါ "Allow" နှိပ်ပါ။';
+      return;
+    }
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(mediaStream);
+    mediaRecorder.ondataavailable = e => { if(e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => {
+        addOrUpdateEntry(phrase, voiceType, reader.result);
+        newPhraseEl.value = '';
+        recNotice.classList.remove('warn');
+        recNotice.textContent = '"' + phrase + '" (' + (TYPE_LABELS[voiceType] || voiceType) + ') အတွက် အသံ သိမ်းပြီးပါပြီ။';
+      };
+      reader.readAsDataURL(blob);
+      if(mediaStream){ mediaStream.getTracks().forEach(t => t.stop()); }
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    recordBtn.textContent = 'ရပ်ပါမည်';
+    recordBtn.classList.add('recording');
+    recNotice.classList.remove('warn');
+    recNotice.textContent = 'အသံသွင်းနေသည်... ပြီးလျှင် "ရပ်ပါမည်" ကိုနှိပ်ပါ။';
+  } else {
+    mediaRecorder.stop();
+    isRecording = false;
+    recordBtn.textContent = 'အသံသွင်းမည်';
+    recordBtn.classList.remove('recording');
+  }
+}
+recordBtn.addEventListener('click', toggleRecord);
+
+function addOrUpdateEntry(phrase, voiceType, dataUrl){
+  const existing = bank.find(e => e.phrase === phrase && e.voiceType === voiceType);
+  if(existing){ existing.dataUrl = dataUrl; }
+  else { bank.push({ phrase, voiceType, dataUrl }); }
+  renderBank();
+  refreshProfileOptions();
+}
+
+function renderBank(){
+  bankListEl.innerHTML = '';
+  if(!bank.length){
+    bankListEl.innerHTML = '<div class="empty">သိမ်းထားသော ကိုယ်ပိုင်အသံ မရှိသေးပါ။</div>';
+    return;
+  }
+  bank.forEach((entry, i) => {
+    const row = document.createElement('div');
+    row.className = 'bank-item';
+
+    const word = document.createElement('div');
+    word.className = 'word';
+    word.textContent = entry.phrase;
+
+    const badge = document.createElement('div');
+    badge.className = 'type-badge';
+    badge.textContent = TYPE_LABELS[entry.voiceType] || entry.voiceType;
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'icon-btn';
+    playBtn.textContent = 'ဖွင့်ကြည့်';
+    playBtn.addEventListener('click', () => { new Audio(entry.dataUrl).play(); });
+
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'icon-btn';
+    dlBtn.textContent = '🔽 MP3';
+    dlBtn.addEventListener('click', () => { downloadAsMp3(entry.dataUrl, entry.phrase.replace(/\s+/g,'_') + '.mp3'); });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'icon-btn';
+    delBtn.textContent = 'ဖျက်ပါ';
+    delBtn.addEventListener('click', () => {
+      bank.splice(i, 1);
+      renderBank();
+      refreshProfileOptions();
+    });
+
+    actions.appendChild(playBtn);
+    actions.appendChild(dlBtn);
+    actions.appendChild(delBtn);
+    row.appendChild(word);
+    row.appendChild(badge);
+    row.appendChild(actions);
+    bankListEl.appendChild(row);
+  });
+}
+renderBank();
+refreshProfileOptions();
+
+/* ---------- export / import ---------- */
+document.getElementById('export-btn').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(bank)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'myanmar-voice-bank.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+const importFileEl = document.getElementById('import-file');
+document.getElementById('import-btn').addEventListener('click', () => importFileEl.click());
+importFileEl.addEventListener('change', () => {
+  const file = importFileEl.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const loaded = JSON.parse(reader.result);
+      if(Array.isArray(loaded)){
+        loaded.forEach(e => {
+          if(e && e.phrase && e.dataUrl) addOrUpdateEntry(e.phrase, e.voiceType || 'other', e.dataUrl);
+        });
+      }
+    } catch(err){
+      recNotice.classList.add('warn');
+      recNotice.textContent = 'ဖိုင် ဖတ်ရာတွင် အမှားရှိသည်။ .json ဖိုင်မှန်ကန်မှုကို စစ်ပါ။';
+    }
+  };
+  reader.readAsText(file);
+  importFileEl.value = '';
+});
+
+/* ---------- Browser bar ဖျောက်ရန် (Fullscreen) ---------- */
+(function(){
+  const fsBtn = document.getElementById('fs-btn');
+  const root = document.documentElement;
+  const fsSupported = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+  const installed = window.matchMedia('(display-mode: standalone)').matches ||
+                    window.matchMedia('(display-mode: fullscreen)').matches ||
+                    window.navigator.standalone === true;
+
+  // app အဖြစ် install လုပ်ထားပြီးသား (bar မရှိ) သို့မဟုတ် fullscreen မထောက်ပံ့ရင် ခလုတ်ဖျောက်
+  if(installed || !fsSupported){ fsBtn.style.display = 'none'; return; }
+
+  const isFs = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+  function enterFs(){
+    try{
+      const p = root.requestFullscreen ? root.requestFullscreen({ navigationUI: 'hide' }) : root.webkitRequestFullscreen();
+      if(p && p.catch){ p.catch(() => {}); }
+    } catch(e){}
+  }
+  function exitFs(){
+    try{ (document.exitFullscreen || document.webkitExitFullscreen).call(document); } catch(e){}
+  }
+  function syncIcon(){ fsBtn.textContent = isFs() ? '⤡' : '⤢'; }
+
+  fsBtn.addEventListener('click', () => { isFs() ? exitFs() : enterFs(); });
+  document.addEventListener('fullscreenchange', syncIcon);
+  document.addEventListener('webkitfullscreenchange', syncIcon);
+
+  // ဖုန်း/tablet မှာ ပထမဆုံး touch လုပ်တာနဲ့ အလိုအလျောက် fullscreen ဝင်
+  if(window.matchMedia('(pointer: coarse)').matches){
+    document.addEventListener('click', (e) => {
+      if(e.target.closest && e.target.closest('#fs-btn')) return;
+      if(!isFs()){ enterFs(); }
+    }, { once: true });
+  }
+})();
+</script>
+</body>
+</html>
